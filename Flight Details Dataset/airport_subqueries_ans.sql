@@ -134,7 +134,6 @@ SELECT
     FROM flight_details f1
 		WHERE status = 'Delayed' and (HOUR(actual_time) * 60 + MINUTE(actual_time)) - (HOUR(scheduled_time) * 60 + MINUTE(scheduled_time)) >
 (SELECT
-	airline,
 	AVG((HOUR(actual_time) * 60 + MINUTE(actual_time)) - (HOUR(scheduled_time) * 60 + MINUTE(scheduled_time)))AS delay_mins_avg
 FROM flight_details f2
     WHERE f1.airline = f2.airline and status = 'Delayed'
@@ -162,9 +161,54 @@ FROM
 
 -- Q3: List all flight numbers that were always on time (never delayed or cancelled).
 #(Flights That Were Always On Time (Facebook-style consistency check))
+SELECT 
+	flight_number 
+FROM flight_details 
+	WHERE status NOT IN(
+							 SELECT 
+								DISTINCT flight_number 
+							FROM flight_details 
+								WHERE status IN ('delayed','cancelled')
+ );
 
 -- Q4: List airlines whose average delay is higher than the overall average delay.
 #(Airlines with Above-Average Delays (Overall) (Microsoft-style aggregate filtering))
+SELECT 
+	airline,
+	ROUND(AVG((HOUR(actual_time) * 60 
+						+ 
+				MINUTE(actual_time)) 
+						- 
+				(HOUR(scheduled_time) * 60 
+						+ 
+				MINUTE(scheduled_time))), 2) 
+			AS delay_mins_avg
+FROM flight_details 
+	GROUP BY airline
+HAVING delay_mins_avg > (
+							SELECT
+								ROUND(AVG((HOUR(actual_time) * 60 + MINUTE(actual_time)) 
+											- 
+										(HOUR(scheduled_time) * 60 + MINUTE(scheduled_time))), 2) 
+									AS delay_mins_avg
+							FROM flight_details
+);
+
 
 -- Q5: List the airline(s) with the highest number of total flights.
 #(Find the Busiest Airline by Number of Flights (Amazon-style top-k filter))
+SELECT 
+	airline, 
+    COUNT(*) AS total_flights 
+FROM flight_details 
+	GROUP BY airline
+	HAVING COUNT(*) = (
+						SELECT 
+							MAX(flight_count) 
+						FROM (
+								SELECT 
+									COUNT(*) AS flight_count 
+								FROM flight_details 
+									GROUP BY airline
+								) AS airline_counts
+);
