@@ -22,24 +22,94 @@ SELECT * FROM sales_data;
 
 -- 1. % Contribution of Each Sale by Salesperson
 -- Show what percentage each sale contributes to the total sales of that salesperson.
+SELECT
+	*,
+    SUM(amount) OVER (PARTITION BY salesperson) AS sales_by_each,
+    ROUND((amount/(SUM(amount) OVER (PARTITION BY salesperson)))*100, 2) AS percentage_accum
+FROM sales_data;
 
 --  2. Identify Duplicate Sale Amounts per Salesperson
+SELECT *,
+	RANK() OVER (PARTITION BY salesperson ORDER BY amount) AS dup_sales
+FROM sales_data;
 
 -- 3. Find Highest Sale Per Salesperson
+SELECT
+	*
+FROM (
+	SELECT *,
+		RANK() OVER (PARTITION BY salesperson ORDER BY amount DESC) AS dup_sales
+	FROM sales_data
+    ) d
+WHERE 
+	dup_sales = 1;
 
 --  4. Count of Sales So Far by Date per Region
+SELECT
+	*,
+    ROW_NUMBER() OVER (PARTITION BY region ORDER BY sale_date) AS sale_cnt
+FROM sales_data;
 
 -- 5. Calculate Sale Gap (Days Between Sales) per Salesperson
+SELECT
+	*,
+    DATEDIFF(sale_date, LAG(sale_date) OVER (PARTITION BY salesperson ORDER BY sale_date)) AS gap_days
+FROM sales_data;
 
 --  6. First and Last Sale Date for Each Salesperson
+SELECT 	
+	*,
+    MIN(sale_date) OVER (PARTITION BY salesperson) AS first_sale_date,
+    MAX(sale_date) OVER (PARTITION BY salesperson) AS last_sale_date
+FROM sales_data;
 
 --  7. Flag the First Sale per Region
+SELECT
+		*,
+		CASE
+			WHEN RANK() OVER (PARTITION BY region ORDER BY sale_date) = 1 THEN 'YES' ELSE 'NO' 
+		END AS rank_by_region
+	FROM sales_data;
 
+SELECT 
+	*
+FROM (
+	SELECT
+		*,
+		RANK() OVER (PARTITION BY region ORDER BY sale_date) AS rank_by_region
+	FROM sales_data) saar
+WHERE 
+	rank_by_region = 1;
+    
 --  8. Find Sales Above Regional Average
-
+SELECT
+	*
+FROM (
+	SELECT
+		*,
+		ROUND(AVG(amount) OVER (PARTITION BY region), 2) AS regional_avg
+	FROM sales_data
+) ra
+WHERE 
+	amount > regional_avg;
+    
 --  9. Moving Total of Last 2 Sales (Sliding Window)
+SELECT
+	*,
+    SUM(amount) OVER (PARTITION BY salesperson ORDER BY sale_date ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS moving_total
+FROM sales_data;
 
 -- 10. Find Gaps in Sales (Salespeople Who Skipped >5 Days)
+SELECT
+	*
+FROM (
+	SELECT
+		*,
+		DATEDIFF(sale_date, LAG(sale_date) OVER (PARTITION BY salesperson)) AS gap_days
+	FROM sales_data
+) gp
+WHERE 
+	gap_days > 4;
 
 #Set 1: ROW_NUMBER, RANK, DENSE_RANK
 -- 1 Assign a row number to each sale by salesperson based on sale_date.
